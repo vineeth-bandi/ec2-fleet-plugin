@@ -218,9 +218,31 @@ public class EC2FleetCloud extends AbstractEC2FleetCloud {
         this.cloudStatusIntervalSec = cloudStatusIntervalSec;
         this.noDelayProvision = noDelayProvision;
 
+        /**
+         * This code was originally added to ensure that when config changes were made making termination fail 
+         * see https://github.com/jenkinsci/ec2-fleet-plugin/pull/247. This however causes problems with CasC when 
+         * creating new credentials as the Credentials plugin is not able to fully set up AWS credentials by access key 
+         * secret key strategy until our plugins constructor finishes running. I believe this solution addresses both 
+         * problems since it should only run on a failure to get AWS credentials or if the Fleet doesn't exist with 
+         * the given credentials. This means it maintains the same behavior for UI configurations as before but also 
+         * bypasses the initial credential check from a CasC config. The State is updated again later when needed 
+         * by Update(). The original issue should not be a problem for CasC since the credentials would exist during 
+         * a config change unless the user deleted the credentials. Although this would technically cause the problem, 
+         * it would require the user to purposely delete credentials then make plugin configuration changes which seems 
+         * like a highly unlikely workflow.
+         */
         if (fleet != null) {
-            this.stats = EC2Fleets.get(fleet).getState(
+            try {
+                this.stats = EC2Fleets.get(fleet).getState(
                     getAwsCredentialsId(), region, endpoint, getFleet());
+            } catch (NullPointerException e) {
+                LOGGER.log(Level.WARNING, 
+                String.format("Error initialzing fleet '%s' stats update. Likely due to new credentials in CasC.", fleet), e);
+            } catch (IllegalStateException e) {
+                LOGGER.log(Level.SEVERE, 
+                String.format("Error initialzing fleet '%s' stats update. Fleet '%s' does not exist.", fleet, fleet), e);
+                throw e; // Jenkins should fail in this case? This is previous behavior, but I think it could be a useful log for CasC.
+            }
         }
     }
 
