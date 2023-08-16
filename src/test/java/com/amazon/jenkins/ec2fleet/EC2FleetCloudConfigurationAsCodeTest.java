@@ -2,10 +2,16 @@ package com.amazon.jenkins.ec2fleet;
 
 import com.amazon.jenkins.ec2fleet.fleet.EC2Fleet;
 import com.amazon.jenkins.ec2fleet.fleet.EC2Fleets;
+
+import hudson.model.Label;
+import hudson.model.labels.LabelAtom;
 import hudson.plugins.sshslaves.SSHConnector;
 import hudson.plugins.sshslaves.verifiers.NonVerifyingKeyVerificationStrategy;
+import hudson.slaves.Cloud;
 import io.jenkins.plugins.casc.misc.ConfiguredWithCode;
 import io.jenkins.plugins.casc.misc.JenkinsConfiguredWithCodeRule;
+
+import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -92,5 +98,19 @@ public class EC2FleetCloudConfigurationAsCodeTest {
 
         SSHConnector sshConnector = (SSHConnector) cloud.getComputerConnector();
         assertEquals(sshConnector.getSshHostKeyVerificationStrategy().getClass(), NonVerifyingKeyVerificationStrategy.class);
+    }
+
+    @Test
+    @ConfiguredWithCode("EC2FleetCloud/max-configuration-as-code.yml")
+    public void shouldCreateCloudFromNewCredentials() {
+        assertEquals(jenkinsRule.jenkins.clouds.size(), 1);
+        //todo
+    }
+
+    @Test
+    @ConfiguredWithCode("EC2FleetCloud/max-configuration-as-code.yml")
+    public void shouldErrorOnInvalidFleet() {
+        assertEquals(jenkinsRule.jenkins.clouds.size(), 1);
+        //todo
     }
 }
