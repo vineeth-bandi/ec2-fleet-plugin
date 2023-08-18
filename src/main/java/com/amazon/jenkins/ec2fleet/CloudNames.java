@@ -8,11 +8,11 @@ import java.util.stream.Collectors;
 
 public class CloudNames {
 
-  public static Boolean isUnique(final String name) {
+  public synchronized static Boolean isUnique(final String name) {
     return !Jenkins.get().clouds.stream().anyMatch(c -> c.name.equals(name));
   }
 
-  public static String generateUnique(final String defaultName) {
+  public synchronized static String generateUnique(final String defaultName) {
     final Set<String> usedNames = Jenkins.get().clouds != null
             ? Jenkins.get().clouds.stream().map(c -> c.name).collect(Collectors.toSet())
             : Collections.emptySet();
