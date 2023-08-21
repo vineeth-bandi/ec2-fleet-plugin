@@ -404,12 +404,12 @@ public class EC2FleetCloud extends AbstractEC2FleetCloud {
         this.minSize = Math.max(0, minSize);
     }
 
-    public int getMinSpareSize() {
+    public synchronized int getMinSpareSize() {
         return minSpareSize;
     }
 
     @DataBoundSetter
-    public void setMinSpareSize(int minSpareSize) {
+    public synchronized void setMinSpareSize(int minSpareSize) {
         this.minSpareSize = Math.max(0, minSpareSize);
     }
 

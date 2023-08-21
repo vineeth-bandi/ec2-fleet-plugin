@@ -7,7 +7,8 @@ public enum EC2AgentTerminationReason {
     IDLE_FOR_TOO_LONG("Agent idle for too long"),
     MAX_TOTAL_USES_EXHAUSTED("MaxTotalUses exhausted for agent"),
     EXCESS_CAPACITY("Excess capacity for fleet"),
-    AGENT_DELETED("Agent deleted");
+    AGENT_DELETED("Agent deleted"),
+    AGENT_ORPHANED("Agent orphaned");
 
     private final String description;
 

@@ -7,6 +7,7 @@ import hudson.model.ExecutorListener;
 import hudson.model.Node;
 import hudson.model.Queue;
 import hudson.slaves.RetentionStrategy;
+import jenkins.model.Jenkins;
 
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
@@ -18,6 +19,7 @@ import java.util.logging.Logger;
 public class EC2RetentionStrategy extends RetentionStrategy<EC2FleetNodeComputer> implements ExecutorListener {
     private static final Logger LOGGER = Logger.getLogger(EC2RetentionStrategy.class.getName());
     private static final int RE_CHECK_IN_A_MINUTE = 1;
+    private static final long ORPHAN_TIME_LIMIT = TimeUnit.MINUTES.toMillis(1);
 
     /**
      * Will be called under {@link hudson.model.Queue#withLock(Runnable)}
@@ -31,14 +33,20 @@ public class EC2RetentionStrategy extends RetentionStrategy<EC2FleetNodeComputer
     @Override
     public long check(final EC2FleetNodeComputer fc) {
         final AbstractEC2FleetCloud cloud = fc.getCloud();
+        boolean isOrphaned = false;
 
         LOGGER.fine(String.format("Checking if node '%s' is idle ", fc.getName()));
 
-        // in some multi-thread edge cases cloud could be null for some time, just be ok with that
         if (cloud == null) {
-            LOGGER.warning("Cloud is null for computer " + fc.getDisplayName()
-                    + ". This should be autofixed in a few minutes, if not please create an issue for the plugin");
-            return RE_CHECK_IN_A_MINUTE;
+            final long idleTime = System.currentTimeMillis() - fc.getIdleStartMilliseconds();
+
+            if (idleTime >= ORPHAN_TIME_LIMIT) {
+                LOGGER.log(Level.INFO, String.format("Instance %s may have been orphaned due to not having an associated cloud for too long.", fc.getDisplayName()));
+                isOrphaned = true;
+            } else {
+                LOGGER.log(Level.INFO, "Instance:" + fc.getDisplayName() + " does not currently have an associated cloud and will be marked orphaned in " + TimeUnit.MILLISECONDS.toSeconds(ORPHAN_TIME_LIMIT - idleTime) + " seconds.");
+                return RE_CHECK_IN_A_MINUTE;
+            }
         }
 
         // Ensure that the EC2FleetCloud cannot be mutated from under us while
@@ -62,6 +70,16 @@ public class EC2RetentionStrategy extends RetentionStrategy<EC2FleetNodeComputer
                 //  Hence, determine the reasons for termination here using persisted fields for accurate handling of termination.
                 if (fc.isMarkedForDeletion()) {
                     reason = EC2AgentTerminationReason.AGENT_DELETED;
+                } else if (isOrphaned) {
+                    reason = EC2AgentTerminationReason.AGENT_ORPHANED;
+                    try {
+                        //TODO: terminate instance and move this logic into a method
+                        Jenkins.get().removeNode(node);
+                        // Registry.getEc2Api().terminateInstances(Registry.getEc2Api().connect(getAwsCredentialsId(), region, endpoint);, node.getNodeName());
+                        // LOGGER.log(Level.INFO, String.format("Terminated instances: %s", node.getNodeName());
+                    } catch (Exception e) {
+                        LOGGER.log(Level.WARNING, String.format("Error removing orphaned node %s.", node.getNodeName()));
+                    }
                 } else if (cloud.hasExcessCapacity()) {
                     reason = EC2AgentTerminationReason.EXCESS_CAPACITY;
                 } else if (cloud instanceof EC2FleetCloud && !((EC2FleetCloud) cloud).hasUnlimitedUsesForNodes()
